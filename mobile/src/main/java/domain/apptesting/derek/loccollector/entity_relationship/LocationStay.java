@@ -25,6 +25,21 @@ public class LocationStay extends Entity
         setFieldValue(KEY_STAY_ID,stay_id);
     }
 
+    /**
+     * Construct a LocationStay object retrieved from the database. This constructor constructs a fully functioning place. 
+     * @param startTime The starting time of this stay.
+     * @param endTime The ending time of this stay.
+     * @param duration the duration of this stay.
+     * @param loc The location visited by the user.
+     */
+    public LocationStay(long startTime, long endTime, long duration, Place loc)
+    {
+        setFieldValue(KEY_START_TIME,startTime);
+        setFieldValue(KEY_END_TIME,endTime);
+        setFieldValue(KEY_DURATION,duration);
+        setFieldValue(KEY_PLID,loc);
+    }
+
     public String toString()
     {
         return String.format("%s Stay from %s to %s\nof %s\nat %s",
