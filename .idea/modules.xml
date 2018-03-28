@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/LocCollector.iml" filepath="$PROJECT_DIR$/LocCollector.iml" />
+      <module fileurl="file://$PROJECT_DIR$/LocationCollector.iml" filepath="$PROJECT_DIR$/LocationCollector.iml" />
       <module fileurl="file://$PROJECT_DIR$/mobile/mobile.iml" filepath="$PROJECT_DIR$/mobile/mobile.iml" />
       <module fileurl="file://$PROJECT_DIR$/things/things.iml" filepath="$PROJECT_DIR$/things/things.iml" />
     </modules>
