@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="domain.apptesting.derek.loccollector">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="domain.apptesting.derek.loccollector"
+    tools:overrideLibrary="io.github.privacystreams.core">
 
     <application
         android:allowBackup="true"

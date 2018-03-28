@@ -35,6 +35,7 @@ public class DBHandler extends SQLiteOpenHelper
                 TABLE_LOC,KEY_LAT,KEY_LNG,KEY_PLACE_NAME,KEY_PLACE_TYPE,
                 KEY_STREET_NUM,KEY_ROUTE,KEY_NEIGHBORHOOD,KEY_LOCALITY,KEY_ADMINISTRATIVE2,KEY_ADMINISTRATIVE1,
                 KEY_COUNTRY,KEY_ZIP,KEY_STREET_ADDRESS,KEY_PLID);
+        db.execSQL(CREATE_LOC_TABLE);
     }
 
     public void onOpen(SQLiteDatabase db)
