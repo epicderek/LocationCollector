@@ -1,12 +1,7 @@
 package domain.apptesting.derek.loccollector;
 
-import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
-import io.github.privacystreams.test;
-
-import domain.apptesting.derek.loccollector.utils.JsonUtils;
+import android.support.v7.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity
 {

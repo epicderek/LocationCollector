@@ -1,1 +1,1 @@
-include ':mobile', ':things', ':privacystreams-android-sdk'
+include ':mobile'
