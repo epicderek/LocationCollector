@@ -22,6 +22,11 @@ public class DBHandler extends SQLiteOpenHelper
     private static final String DATA_BASE_NAME = "location_data_base";
     private static final int DATA_BASE_VERSION = 1;
 
+    /**
+     * The id of the last stay in which the user was previously at by the last collection of data.
+     */
+    private Long lastStay;
+
     public DBHandler(Context con)
     {
         super(con,DATA_BASE_NAME,null,DATA_BASE_VERSION);
@@ -35,7 +40,12 @@ public class DBHandler extends SQLiteOpenHelper
                 TABLE_LOC,KEY_LAT,KEY_LNG,KEY_PLACE_NAME,KEY_PLACE_TYPE,
                 KEY_STREET_NUM,KEY_ROUTE,KEY_NEIGHBORHOOD,KEY_LOCALITY,KEY_ADMINISTRATIVE2,KEY_ADMINISTRATIVE1,
                 KEY_COUNTRY,KEY_ZIP,KEY_STREET_ADDRESS,KEY_PLID);
+        String CREATE_STAY_TABLE = String.format("create table %s (%s integer, %s integer, %s integer, %s integer," +
+                        "%s integer primary key autoincrement, foreign key (%s) references %s (%s));",
+                TABLE_LOC_STAY,KEY_START_TIME,KEY_END_TIME,KEY_DURATION,KEY_PLID,
+                KEY_STAY_ID,KEY_PLID,TABLE_LOC,KEY_PLID);
         db.execSQL(CREATE_LOC_TABLE);
+        db.execSQL(CREATE_STAY_TABLE);
     }
 
     public void onOpen(SQLiteDatabase db)
@@ -69,6 +79,9 @@ public class DBHandler extends SQLiteOpenHelper
 
     /**
      * Record this Place information in the sql database and return the loc_id of this Place. If the Place already exists in the database, the id of that Place is returned.
+     * The insertion of data is not instantly complete, only the coordinates are inserted by this method. The rest is reserved to the separate process
+     * of the geocoder.This method illustrates the general solution of location storage--insertion of coordinates and reflective addition of derived
+     * information if such an object is inserted into the database.
      * @param loc The Place to be recorded in the database.
      *@return The assigned place id of this place.
      */
@@ -77,22 +90,12 @@ public class DBHandler extends SQLiteOpenHelper
         Cursor cur = dupSearch((double)loc.getValueByField(KEY_LAT),(double)loc.getValueByField(KEY_LNG));
         //If the Place already exists in the database.
         if(cur.moveToNext())
-            return cur.getLong(13);
+            return cur.getLong(cur.getColumnIndex(KEY_PLID));
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(KEY_LAT,(Double)loc.getValueByField(KEY_LAT));
         values.put(KEY_LNG,(Double)loc.getValueByField(KEY_LNG));
         values.put(KEY_PLACE_NAME,(String)loc.getValueByField(KEY_PLACE_NAME));
-        values.put(KEY_PLACE_TYPE,(String)loc.getValueByField(KEY_PLACE_TYPE));
-        values.put(KEY_STREET_NUM,(String)loc.getValueByField(KEY_STREET_NUM));
-        values.put(KEY_ROUTE,(String)loc.getValueByField(KEY_ROUTE));
-        values.put(KEY_NEIGHBORHOOD,(String)loc.getValueByField(KEY_NEIGHBORHOOD));
-        values.put(KEY_LOCALITY,(String)loc.getValueByField(KEY_LOCALITY));
-        values.put(KEY_ADMINISTRATIVE2,(String)loc.getValueByField(KEY_ADMINISTRATIVE2));
-        values.put(KEY_ADMINISTRATIVE1,(String)loc.getValueByField(KEY_ADMINISTRATIVE1));
-        values.put(KEY_COUNTRY,(String)loc.getValueByField(KEY_COUNTRY));
-        values.put(KEY_ZIP,(String)loc.getValueByField(KEY_ZIP));
-        values.put(KEY_STREET_ADDRESS,(String)loc.getValueByField(KEY_STREET_ADDRESS));
         loc.setFieldValue(KEY_PLID,db.insert(TABLE_LOC,null,values));
         return loc.getValueByField(KEY_PLID);
     }
@@ -200,6 +203,85 @@ public class DBHandler extends SQLiteOpenHelper
             pls.add(processPlace(fillFromRetrieval(cur)));
         return pls;
     }
+
+    /**
+     * Associate the current location with the given time.
+     * The utility of this method is three-fold. To check if the current
+     * location is still within the range of a given location,
+     * to pass if it is, and to record the end of the stay at the place of the
+     * previous instant.
+     * @param time The current time.
+     * @param lat The latitude.
+     * @param lng The longitude.
+     */
+    public void updateStay(long time, double lat, double lng)
+    {
+        SQLiteDatabase db = getWritableDatabase();
+        Cursor stay = lastStay==null?null:db.query(TABLE_LOC_STAY,null,String.format("%s = ?",KEY_STAY_ID),new String[]{String.valueOf(lastStay)},null,null,null);
+        //A cursor to check if the present location is already present.
+        Cursor cur;
+        Long last_loc_id = null;
+        Long this_loc_id = null;
+        //The starting time of the previous activity.
+        Long startTime = null;
+        if(lastStay!=null)
+        {
+            stay.moveToNext();
+            last_loc_id = stay.getLong(stay.getColumnIndex(KEY_PLID));
+            startTime = stay.getLong(stay.getColumnIndex(KEY_START_TIME));
+        }
+        //If this place already exists.
+        if((cur=dupSearch(lat,lng)).moveToNext())
+        {
+            this_loc_id = cur.getLong(cur.getColumnIndex(KEY_PLID));
+            //If this place was the last stay the user occasioned.
+            if(this_loc_id==last_loc_id)
+            {
+                ContentValues vals = new ContentValues();
+                vals.put(KEY_END_TIME,time);
+                db.update(TABLE_LOC_STAY,vals,String.format("%s = ?",KEY_STAY_ID),new String[]{String.valueOf(lastStay)});
+                db.close();
+                return;
+            }
+        }
+        else
+        {
+            Place loc = new Place(lat,lng);
+            this_loc_id = addPlace(loc);
+            loc.db = this;
+        }
+        //Finalize the previous stay if a previous stay exists.
+        if(lastStay!=null)
+        {
+            ContentValues vals = new ContentValues();
+            vals.put(KEY_END_TIME,time);
+            vals.put(KEY_DURATION,time-startTime);
+            db.update(TABLE_LOC_STAY,vals,String.format("%s = ?",KEY_STAY_ID),new String[]{String.valueOf(lastStay)});
+        }
+        ContentValues vals = new ContentValues();
+        vals.put(KEY_PLID,this_loc_id);
+        vals.put(KEY_START_TIME,time);
+        vals.put(KEY_END_TIME,time);
+        lastStay = db.insert(TABLE_LOC_STAY,null,vals);
+    }
+
+    /**
+     * Get all LocationStay information processed and stored in the database.
+     * @return All the stay information of the user.
+     */
+    public List<LocationStay> getCurrentStays()
+    {
+        List<LocationStay> stays = new LinkedList<>();
+        Cursor cur = getReadableDatabase().rawQuery("select * from "+TABLE_LOC_STAY,null);
+        while(cur.moveToNext())
+            stays.add(new LocationStay(cur.getLong(cur.getColumnIndex(KEY_START_TIME)),
+                    cur.getLong(cur.getColumnIndex(KEY_END_TIME)),
+                    cur.getLong(cur.getColumnIndex(KEY_DURATION)),
+                    cur.getLong(cur.getColumnIndex(KEY_PLID)),
+                    cur.getLong(cur.getColumnIndex(KEY_STAY_ID))));
+        return stays;
+    }
+
 
 
 }
